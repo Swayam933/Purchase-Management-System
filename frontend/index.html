@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Item &amp; Purchase Management System</title>
+    <meta
+      name="description"
+      content="Manage item types, item master data, stock availability and multi-item purchase orders."
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="app-header">
+      <div class="app-header__inner">
+        <a class="brand" href="#/items">
+          <span class="brand__mark" aria-hidden="true">IP</span>
+          <span class="brand__text">
+            <strong>Item &amp; Purchase</strong>
+            <small>Management System</small>
+          </span>
+        </a>
+
+        <nav class="app-nav" aria-label="Main navigation">
+          <a href="#/item-types" data-nav="/item-types">Item Types</a>
+          <a href="#/items" data-nav="/items">Items</a>
+          <a href="#/purchases" data-nav="/purchases">Purchases</a>
+          <a href="#/stock" data-nav="/stock">Stock</a>
+        </nav>
+
+        <a class="btn btn--primary btn--sm app-header__cta" href="#/purchases/new">
+          New Purchase
+        </a>
+      </div>
+    </header>
+
+    <main id="main" class="app-main" tabindex="-1">
+      <p class="loading">Loading…</p>
+    </main>
+
+    <footer class="app-footer">
+      <p>
+        Purchases are historical records and cannot be deleted. Items used in a purchase are
+        deactivated rather than removed.
+      </p>
+    </footer>
+
+    <!-- Toast announcements for screen readers and sighted users alike. -->
+    <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,383 @@
+{
+  "info": {
+    "name": "Item & Purchase Management System",
+    "description": "REST API for item types, item master, stock availability and multi-item purchase orders. Set the `baseUrl` variable if the API is not on http://localhost:3000.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "itemTypeId", "value": "1" },
+    { "key": "itemId", "value": "1" },
+    { "key": "purchaseId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Item Types",
+      "item": [
+        {
+          "name": "List item types",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/item-types", "host": ["{{baseUrl}}"], "path": ["item-types"] }
+          }
+        },
+        {
+          "name": "Get item type",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/item-types/{{itemTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["item-types", "{{itemTypeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create item type",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"typeName\": \"Hardware\"\n}" },
+            "url": { "raw": "{{baseUrl}}/item-types", "host": ["{{baseUrl}}"], "path": ["item-types"] }
+          }
+        },
+        {
+          "name": "Create item type - duplicate (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"typeName\": \"Electronics\"\n}" },
+            "url": { "raw": "{{baseUrl}}/item-types", "host": ["{{baseUrl}}"], "path": ["item-types"] }
+          }
+        },
+        {
+          "name": "Update item type",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"typeName\": \"Hand Tools\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/item-types/{{itemTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["item-types", "{{itemTypeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete item type",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/item-types/{{itemTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["item-types", "{{itemTypeId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Items",
+      "item": [
+        {
+          "name": "List items",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/items", "host": ["{{baseUrl}}"], "path": ["items"] }
+          }
+        },
+        {
+          "name": "List items - filtered",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/items?active=true&availability=low_stock&q=note",
+              "host": ["{{baseUrl}}"],
+              "path": ["items"],
+              "query": [
+                { "key": "active", "value": "true" },
+                { "key": "availability", "value": "low_stock" },
+                { "key": "q", "value": "note" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get item details",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/items/{{itemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["items", "{{itemId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create item",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Monitor\",\n  \"itemTypeId\": 1,\n  \"purchaseDate\": \"2026-09-24\",\n  \"stockAvailable\": 12,\n  \"active\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/items", "host": ["{{baseUrl}}"], "path": ["items"] }
+          }
+        },
+        {
+          "name": "Create item - missing fields (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/items", "host": ["{{baseUrl}}"], "path": ["items"] }
+          }
+        },
+        {
+          "name": "Create item - negative stock (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bad Stock\",\n  \"itemTypeId\": 1,\n  \"purchaseDate\": \"2026-09-24\",\n  \"stockAvailable\": -5\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/items", "host": ["{{baseUrl}}"], "path": ["items"] }
+          }
+        },
+        {
+          "name": "Create item - invalid item type (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Orphan\",\n  \"itemTypeId\": 9999,\n  \"purchaseDate\": \"2026-09-24\",\n  \"stockAvailable\": 1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/items", "host": ["{{baseUrl}}"], "path": ["items"] }
+          }
+        },
+        {
+          "name": "Update item",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Laptop\",\n  \"itemTypeId\": 1,\n  \"purchaseDate\": \"2026-08-25\",\n  \"stockAvailable\": 10,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/items/{{itemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["items", "{{itemId}}"]
+            }
+          }
+        },
+        {
+          "name": "Deactivate item",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"active\": false\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/items/{{itemId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["items", "{{itemId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Activate item",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"active\": true\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/items/{{itemId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["items", "{{itemId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Delete item (409 when purchased)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/items/{{itemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["items", "{{itemId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Purchases",
+      "item": [
+        {
+          "name": "List purchases",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/purchases", "host": ["{{baseUrl}}"], "path": ["purchases"] }
+          }
+        },
+        {
+          "name": "Next order id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/purchases/next-order-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["purchases", "next-order-id"]
+            }
+          }
+        },
+        {
+          "name": "Purchase details (JOIN)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/purchases/{{purchaseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["purchases", "{{purchaseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create purchase - 3 items",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchaseDate\": \"2026-08-25\",\n  \"items\": [\n    { \"itemId\": 1, \"quantity\": 2 },\n    { \"itemId\": 2, \"quantity\": 5 },\n    { \"itemId\": 3, \"quantity\": 3 }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/purchases", "host": ["{{baseUrl}}"], "path": ["purchases"] }
+          }
+        },
+        {
+          "name": "Create purchase - no items (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"purchaseDate\": \"2026-08-25\",\n  \"items\": []\n}" },
+            "url": { "raw": "{{baseUrl}}/purchases", "host": ["{{baseUrl}}"], "path": ["purchases"] }
+          }
+        },
+        {
+          "name": "Create purchase - quantity zero (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchaseDate\": \"2026-08-25\",\n  \"items\": [{ \"itemId\": 1, \"quantity\": 0 }]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/purchases", "host": ["{{baseUrl}}"], "path": ["purchases"] }
+          }
+        },
+        {
+          "name": "Create purchase - insufficient stock (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchaseDate\": \"2026-08-26\",\n  \"items\": [{ \"itemId\": 1, \"quantity\": 9999 }]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/purchases", "host": ["{{baseUrl}}"], "path": ["purchases"] }
+          }
+        },
+        {
+          "name": "Create purchase - inactive item (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchaseDate\": \"2026-08-26\",\n  \"items\": [{ \"itemId\": 8, \"quantity\": 1 }]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/purchases", "host": ["{{baseUrl}}"], "path": ["purchases"] }
+          }
+        },
+        {
+          "name": "Create purchase - duplicate item (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchaseDate\": \"2026-08-26\",\n  \"items\": [\n    { \"itemId\": 1, \"quantity\": 1 },\n    { \"itemId\": 1, \"quantity\": 2 }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/purchases", "host": ["{{baseUrl}}"], "path": ["purchases"] }
+          }
+        },
+        {
+          "name": "Update purchase - adjust quantities",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purchaseDate\": \"2026-08-27\",\n  \"items\": [\n    { \"itemId\": 1, \"quantity\": 5 },\n    { \"itemId\": 2, \"quantity\": 5 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/purchases/{{purchaseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["purchases", "{{purchaseId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete purchase (405 - not allowed)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/purchases/{{purchaseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["purchases", "{{purchaseId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stock",
+      "item": [
+        {
+          "name": "Stock overview",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/stock", "host": ["{{baseUrl}}"], "path": ["stock"] }
+          }
+        },
+        {
+          "name": "Stock overview - out of stock only",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/stock?availability=out_of_stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["stock"],
+              "query": [{ "key": "availability", "value": "out_of_stock" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
