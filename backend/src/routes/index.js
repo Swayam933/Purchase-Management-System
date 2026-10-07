@@ -9,6 +9,19 @@ import { ok } from '../utils/response.js';
 
 const router = Router();
 
+router.get('/', (_req, res) =>
+  ok(res, {
+    message: 'Item & Purchase Management API',
+    endpoints: {
+      health: '/api/health',
+      itemTypes: '/api/item-types',
+      items: '/api/items',
+      purchases: '/api/purchases',
+      stock: '/api/stock',
+    },
+  }),
+);
+
 router.get('/health', (_req, res) =>
   ok(res, {
     status: 'ok',

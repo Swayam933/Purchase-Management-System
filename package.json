@@ -1,0 +1,12 @@
+{
+  "name": "item-purchase-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Item & Purchase Management System",
+  "scripts": {
+    "start": "npm start --prefix backend",
+    "dev": "npm run dev --prefix backend",
+    "install:all": "npm install --prefix backend"
+  }
+}
+
