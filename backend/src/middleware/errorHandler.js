@@ -1,5 +1,4 @@
 import { AppError } from '../utils/AppError.js';
-import { config } from '../config/env.js';
 
 /**
  * Single exit point for every failure (assignment section 14).
@@ -32,12 +31,33 @@ export const errorHandler = (error, req, res, next) => {
 
   console.error(`[error] ${req.method} ${req.originalUrl}`, error);
 
+  if (error?.code === 'ER_DUP_ENTRY') {
+    return res.status(409).json({
+      success: false,
+      error: { code: 'CONFLICT', message: 'A record with the same unique value already exists' },
+    });
+  }
+  if (['ER_ROW_IS_REFERENCED_2', 'ER_NO_REFERENCED_ROW_2'].includes(error?.code)) {
+    return res.status(409).json({
+      success: false,
+      error: { code: 'CONFLICT', message: 'This change conflicts with related records' },
+    });
+  }
+  if (
+    error?.code === 'ER_NO_SUCH_TABLE' ||
+    ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'PROTOCOL_CONNECTION_LOST'].includes(error?.code)
+  ) {
+    return res.status(503).json({
+      success: false,
+      error: { code: 'DATABASE_UNAVAILABLE', message: 'The MySQL database is unavailable' },
+    });
+  }
+
   return res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_ERROR',
       message: 'Something went wrong while processing the request',
-      ...(config.env === 'development' ? { debug: error?.message } : {}),
     },
   });
 };

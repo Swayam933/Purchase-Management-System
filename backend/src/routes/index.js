@@ -3,9 +3,10 @@ import itemTypeRoutes from './itemTypeRoutes.js';
 import itemRoutes from './itemRoutes.js';
 import purchaseRoutes from './purchaseRoutes.js';
 import stockRoutes from './stockRoutes.js';
-import { stats } from '../data/store.js';
+import { databaseHealth } from '../data/mysql.js';
 import { config } from '../config/env.js';
 import { ok } from '../utils/response.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const router = Router();
 
@@ -22,15 +23,13 @@ router.get('/', (_req, res) =>
   }),
 );
 
-router.get('/health', (_req, res) =>
+router.get('/health', asyncHandler(async (_req, res) =>
   ok(res, {
-    status: 'ok',
+    ...(await databaseHealth()),
     uptimeSeconds: Math.round(process.uptime()),
-    storage: 'in-memory',
     lowStockThreshold: config.lowStockThreshold,
-    records: stats(),
   }),
-);
+));
 
 router.use('/item-types', itemTypeRoutes);
 router.use('/items', itemRoutes);

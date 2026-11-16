@@ -17,6 +17,7 @@ USE item_purchase_db;
 -- Drop in dependency order so the script is re-runnable.
 DROP TABLE IF EXISTS purchase_items;
 DROP TABLE IF EXISTS purchases;
+DROP TABLE IF EXISTS purchase_order_sequence;
 DROP TABLE IF EXISTS items;
 DROP TABLE IF EXISTS item_types;
 
@@ -68,6 +69,16 @@ CREATE TABLE purchases (
   PRIMARY KEY (id),
   UNIQUE KEY uq_purchases_order_id (order_id)
 ) ENGINE = InnoDB;
+
+-- A locked singleton row allocates generated PO numbers without races.
+CREATE TABLE purchase_order_sequence (
+  id         TINYINT UNSIGNED NOT NULL,
+  next_value INT UNSIGNED NOT NULL DEFAULT 1,
+  PRIMARY KEY (id),
+  CONSTRAINT chk_purchase_order_sequence_singleton CHECK (id = 1)
+) ENGINE = InnoDB;
+
+INSERT INTO purchase_order_sequence (id, next_value) VALUES (1, 1);
 
 -- ----------------------------------------------------------------------------
 -- 10.4 purchase_items : Items and quantities belonging to each Purchase

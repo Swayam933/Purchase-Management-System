@@ -9,12 +9,12 @@ import { created, ok } from '../utils/response.js';
 
 export const list = async (req, res) => {
   const filters = parseItemFilters(req.query);
-  const data = itemService.list(filters);
+  const data = await itemService.list(filters);
   ok(res, data, { count: data.length, filters });
 };
 
 export const getById = async (req, res) => {
-  ok(res, itemService.getById(parseId(req.params.id, 'item id')));
+  ok(res, await itemService.getById(parseId(req.params.id, 'item id')));
 };
 
 export const create = async (req, res) => {

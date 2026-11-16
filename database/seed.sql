@@ -19,6 +19,7 @@ TRUNCATE TABLE purchase_items;
 TRUNCATE TABLE purchases;
 TRUNCATE TABLE items;
 TRUNCATE TABLE item_types;
+UPDATE purchase_order_sequence SET next_value = 1 WHERE id = 1;
 SET FOREIGN_KEY_CHECKS = 1;
 
 INSERT INTO item_types (id, type_name) VALUES

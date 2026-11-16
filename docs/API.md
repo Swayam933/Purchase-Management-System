@@ -50,6 +50,7 @@ frontend uses `details[].field` to place messages under the matching input.
 | 405    | `METHOD_NOT_ALLOWED`| `DELETE /api/purchases/:id` — purchases cannot be deleted                 |
 | 409    | `CONFLICT`          | Insufficient stock, inactive item, duplicate name/order id, delete blocked |
 | 500    | `INTERNAL_ERROR`    | Unexpected failure (details are logged server side, never returned)      |
+| 503    | `DATABASE_UNAVAILABLE` | MySQL connection or required table is unavailable                     |
 
 ---
 
@@ -63,7 +64,7 @@ frontend uses `details[].field` to place messages under the matching input.
   "data": {
     "status": "ok",
     "uptimeSeconds": 42,
-    "storage": "in-memory",
+    "storage": "mysql",
     "lowStockThreshold": 5,
     "records": { "itemTypes": 5, "items": 8, "purchases": 1, "purchaseItems": 3 }
   }

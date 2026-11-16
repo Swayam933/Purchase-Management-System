@@ -9,58 +9,28 @@ frontend.
 │  Frontend (vanilla JS SPA)   │  HTTP  │  Backend (Node.js + Express)         │
 │  hash router, 8 screens      │ ─────► │  routes → controllers → validators   │
 │  fetch client, no build step │ ◄───── │  → services (business rules)         │
-└──────────────────────────────┘  JSON  │  → repositories → data store         │
+└──────────────────────────────┘  JSON  │  → repositories → MySQL              │
                                         └──────────────────────────────────────┘
 ```
 
-## Two ways to run it
-
-| Mode | Storage | Setup | Data on restart |
-| ---- | ------- | ----- | --------------- |
-| **A — Quick start (default)** | In-memory | Node only | Resets, demo data reloads |
-| **B — With MySQL** | MySQL 8 | Node + MySQL | Persisted |
-
-The current build runs on an **in-memory store** that mirrors the relational
-design one-for-one, so it works with zero setup. A complete MySQL schema and
-seed file are provided in [`database/`](database), and
-[Swapping in MySQL](#swapping-in-mysql) lists the small code change that points
-the app at the database.
+MySQL is required. All API reads and writes use a MySQL connection pool, and
+purchase creation and updates run in database transactions. A schema and
+optional demo seed are provided in [`database/`](database).
 
 ## Prerequisites
 
-| Software | Version                         | Needed for |
-| -------- | ------------------------------- | ---------- |
-| Node.js  | 18.17 or newer (built on 22.13) | Both modes |
-| npm      | 9 or newer (built on 10.9)      | Both modes |
-| MySQL    | 8.0 or newer                    | Mode B only |
+| Software | Version                         |
+| -------- | ------------------------------- |
+| Node.js  | 18.17 or newer (built on 22.13) |
+| npm      | 9 or newer (built on 10.9)      |
+| MySQL    | 8.0 or newer                    |
 
-No global CLI tools and no frontend build toolchain are required.
-
----
-
-## Mode A — Quick start (in-memory, zero setup)
-
-```bash
-cd backend
-npm install
-npm start
-```
-
-Then open **http://localhost:3000**.
-
-The backend serves the API *and* the frontend from the same origin, so this one
-command runs the whole application. Use `npm run dev` for the same thing with
-automatic restarts on file changes.
-
-| URL                                | What it serves         |
-| ---------------------------------- | ---------------------- |
-| http://localhost:3000              | Frontend               |
-| http://localhost:3000/api          | REST API               |
-| http://localhost:3000/api/health   | Health + record counts |
+MySQL's client is needed to apply the initial SQL files; no global Node.js tools
+or frontend build toolchain are required.
 
 ---
 
-## Mode B — Run with a MySQL database
+## Setup and run
 
 ### 1. Confirm MySQL is running
 
@@ -78,8 +48,8 @@ path, e.g.
 
 ### 2. Create the database and tables
 
-The schema file creates the `item_purchase_db` database and all four tables with
-keys, foreign keys and the stock/quantity constraints.
+The schema creates `item_purchase_db`, the four required relational tables,
+and a sequence table used to assign unique order IDs safely.
 
 ```bash
 # From the project root
@@ -107,8 +77,7 @@ mysql -u root -p < database/seed.sql
 mysql -u root -p -e "USE item_purchase_db; SHOW TABLES; SELECT COUNT(*) AS items FROM items;"
 ```
 
-Expected: four tables (`item_types`, `items`, `purchases`, `purchase_items`) and
-`items = 8` if you loaded the sample data.
+Expected: five tables and `items = 8` if you loaded the sample data.
 
 ### 5. Configure credentials
 
@@ -130,8 +99,8 @@ DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=item_purchase_db
 
-# Turn off the in-memory demo seeding once the DB is wired in
-SEED_DATA=false
+# Optional: set false to skip adding the demo rows at startup
+SEED_DATA=true
 ```
 
 ### 6. Install dependencies and start
@@ -142,18 +111,14 @@ npm install
 npm start                      # loads backend/.env automatically
 ```
 
-Open **http://localhost:3000**.
-
-> **Note on wiring:** provisioning the database (steps 1–5) is complete and
-> ready. Pointing the running code at MySQL is a one-file change in the data
-> layer — see [Swapping in MySQL](#swapping-in-mysql). Until that change is made,
-> the server uses the in-memory store regardless of the `DB_*` variables.
+Open **http://localhost:3000**. Startup verifies connectivity and required
+tables; it fails clearly if MySQL is unavailable or the schema has not been
+installed. The backend loads `.env` automatically.
 
 ### Re-running the schema
 
-`schema.sql` drops and recreates the tables, and `seed.sql` truncates and
-reloads rows, so both files are safe to run again to reset the database to a
-clean state.
+`schema.sql` drops and recreates tables, and `seed.sql` truncates and reloads
+rows. Re-running either resets existing application data; back up data first.
 
 ---
 
@@ -171,21 +136,22 @@ default, and the API base URL can be pointed elsewhere by defining
 
 ## Configuration
 
-All variables live in `backend/.env` (copy from `backend/.env.example`) and every
-one has a working default.
+All variables live in `backend/.env` (copy from `backend/.env.example`). Update
+the MySQL credentials to match your local server.
 
 | Variable              | Default              | Purpose                                     |
 | --------------------- | -------------------- | ------------------------------------------- |
 | `PORT`                | `3000`               | HTTP port                                   |
 | `CORS_ORIGIN`         | `*`                  | `*` or a comma separated allow-list         |
 | `LOW_STOCK_THRESHOLD` | `5`                  | Stock at or below this is "Low Stock"       |
-| `SEED_DATA`           | `true`               | Load the in-memory demo dataset on boot     |
+| `SEED_DATA`           | `true`               | Insert missing demo types/items on boot     |
 | `LOG_FORMAT`          | `dev`                | morgan format, or `off`                     |
-| `DB_HOST`             | `localhost`          | MySQL host (Mode B)                         |
-| `DB_PORT`             | `3306`               | MySQL port (Mode B)                         |
-| `DB_USER`             | `root`               | MySQL user (Mode B)                         |
-| `DB_PASSWORD`         | –                    | MySQL password (Mode B)                     |
-| `DB_NAME`             | `item_purchase_db`   | MySQL database name (Mode B)                |
+| `DB_HOST`             | `localhost`          | MySQL host                                 |
+| `DB_PORT`             | `3306`               | MySQL port                                 |
+| `DB_USER`             | `root`               | MySQL user                                 |
+| `DB_PASSWORD`         | –                    | MySQL password                             |
+| `DB_NAME`             | `item_purchase_db`   | MySQL database name                        |
+| `DB_CONNECTION_LIMIT` | `10`                 | Maximum pooled connections                 |
 
 ## Project structure
 
@@ -200,8 +166,8 @@ backend/
     validators/               payload/query validation → normalized DTOs
     services/                 business rules, transactions, stock maths
     data/
-      store.js                tables, transactions, serialized access
-      seed.js                 demo dataset
+      mysql.js                connection pool, transactions, health check
+      seed.js                 idempotent demo data insertion
       repositories/           all data access, one module per table group
     middleware/               asyncHandler, central error handler, 404
     utils/                    AppError, response envelope, availability rules
@@ -215,7 +181,7 @@ frontend/
     ui.js                     DOM helpers, tables, badges, toasts, dialogs
     views/                    one module per screen
 database/
-  schema.sql                  MySQL database + 4 tables, keys, constraints
+  schema.sql                  MySQL database + 5 tables, keys, constraints
   seed.sql                    sample data (5 types, 8 items, no purchases)
 docs/
   API.md                      full API reference
@@ -228,8 +194,7 @@ docs/
 - **Controllers** parse and respond. They never touch the data store.
 - **Validators** own field-level rules and produce clean DTOs.
 - **Services** own business rules and transaction boundaries.
-- **Repositories** own data access. Every read that needs related data does the
-  join here, with the equivalent SQL in a comment above it.
+- **Repositories** own SQL queries and joins for related data.
 
 ## Screens
 
@@ -362,41 +327,26 @@ No purchases are seeded, so the walkthrough below starts from a clean history.
 7. There is no Delete button on any purchase screen. `DELETE /api/purchases/1`
    answers `405`.
 
-## Swapping in MySQL
+## Database behavior
 
-The data layer is the only thing that changes:
+- The backend uses `mysql2` with a bounded connection pool. Database connection
+  settings are loaded from `backend/.env`.
+- Every purchase create/update uses a MySQL transaction. Item rows are locked
+  with `SELECT ... FOR UPDATE`, and stock deductions are guarded against
+  negative values.
+- Item/type counts and purchase details are retrieved with SQL joins; the
+  purchase detail query joins purchases, purchase items, items, and item types.
+- The generated order-ID sequence is protected by a locked database row, so
+  concurrent requests do not allocate the same generated ID.
+- `GET /api/health` queries MySQL and reports the storage type and record counts.
 
-1. Add a MySQL client (`mysql2`) and a connection pool in `src/data/`.
-2. Reimplement the three modules in `src/data/repositories/` against the pool.
-   Each function already carries its target SQL in a comment, including the two
-   mandatory joins (items → item_types, and purchases → purchase_items → items →
-   item_types).
-3. Replace `transaction()` in `src/data/store.js` with
-   `connection.beginTransaction()` / `commit()` / `rollback()`, and lock rows with
-   `SELECT ... FOR UPDATE` instead of the current serialized queue.
-4. Make stock deduction conditional for a database-level guarantee:
-   `UPDATE items SET stock_available = stock_available - ? WHERE id = ? AND stock_available >= ?`
-   and treat zero affected rows as insufficient stock.
+## Manual validation checklist
 
-Services, controllers, validators and the entire frontend stay untouched. The
-in-memory tables already use the target column set (`items.stock_available`,
-`items.item_type_id`, `purchases.order_id`, `purchase_items.quantity`, …), so the
-schema follows directly from `src/data/store.js`.
-
-## Verification performed
-
-Both suites ran green against this build:
-
-- **API, 74 checks** — item type and item CRUD, every validation message, filters,
-  multi-item purchase creation, stock deduction, insufficient-stock rejection,
-  purchase update deltas (increase, decrease, line removed, line added),
-  rollback after a failed create and a failed update, purchase delete refusal,
-  item delete guard, inactive-item rules, stock view.
-- **UI, 56 checks** — driven through headless Chrome: form prefills, backend
-  validation rendered per field, building and submitting an order, over-stock
-  block, stock figures on the stock screen, quantity edit round-trip, blocked
-  delete surfaced as a toast, activate/deactivate, item type guards, navigation
-  state, and zero console errors.
+- Check `GET /api/health` reports `"storage": "mysql"` and record counts.
+- Create a multi-item purchase and confirm its stock deductions in MySQL.
+- Try an over-stock purchase and confirm it fails without changing stock.
+- Update a purchase quantity and confirm the stock difference is reconciled.
+- Confirm purchase details show item names and types from the SQL joins.
 
 ## Security note
 

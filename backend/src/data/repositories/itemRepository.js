@@ -1,169 +1,157 @@
-import { nextId, nowIso } from '../store.js';
-import { matchesAvailability } from '../../utils/stock.js';
+import { query } from '../mysql.js';
+import { config } from '../../config/env.js';
+import { AVAILABILITY } from '../../utils/stock.js';
 
-/**
- * items data access, including the item -> item_type join required by the
- * assignment (section 12).
- */
+const ITEM_COLUMNS = `i.id, i.name, i.item_type_id AS itemTypeId,
+  i.purchase_date AS purchaseDate, i.stock_available AS stockAvailable,
+  i.active AS active, i.created_at AS createdAt, i.updated_at AS updatedAt`;
 
-/** Emulates the `stock_available >= 0` CHECK constraint. */
-function assertNonNegative(stock) {
-  if (!Number.isInteger(stock) || stock < 0) {
-    // Defence in depth: services validate first, this guarantees the invariant.
-    throw new Error(`Stock integrity violation: refusing to persist stock of ${stock}`);
+const ITEM_WITH_TYPE = `SELECT ${ITEM_COLUMNS}, it.type_name AS itemTypeName
+  FROM items i JOIN item_types it ON i.item_type_id = it.id`;
+
+const ITEM_BY_ID = `SELECT id, name, item_type_id AS itemTypeId,
+  purchase_date AS purchaseDate, stock_available AS stockAvailable,
+  active, created_at AS createdAt, updated_at AS updatedAt FROM items`;
+
+function buildFilters(filters = {}) {
+  const clauses = [];
+  const parameters = [];
+
+  if (filters.itemTypeId !== undefined) {
+    clauses.push('i.item_type_id = ?');
+    parameters.push(filters.itemTypeId);
   }
-}
+  if (filters.active !== undefined) {
+    clauses.push('i.active = ?');
+    parameters.push(filters.active ? 1 : 0);
+  }
+  if (filters.q) {
+    clauses.push('(LOWER(i.name) LIKE ? OR LOWER(it.type_name) LIKE ?)');
+    const needle = `%${filters.q.trim().toLowerCase()}%`;
+    parameters.push(needle, needle);
+  }
+  if (filters.availability === AVAILABILITY.OUT_OF_STOCK) {
+    clauses.push('i.stock_available = 0');
+  } else if (filters.availability === AVAILABILITY.LOW_STOCK) {
+    if (config.lowStockThreshold <= 0) clauses.push('1 = 0');
+    else {
+      clauses.push('i.stock_available > 0 AND i.stock_available <= ?');
+      parameters.push(config.lowStockThreshold);
+    }
+  } else if (filters.availability === AVAILABILITY.IN_STOCK) {
+    clauses.push('i.stock_available > 0');
+  }
 
-/** Joins one item row to its type. */
-function withType(db, item) {
-  if (!item) return null;
-  const type = db.itemTypes.find((row) => row.id === item.itemTypeId) ?? null;
   return {
-    ...item,
-    itemTypeName: type?.typeName ?? null,
+    where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '',
+    parameters,
   };
 }
 
-/**
- * MANDATORY JOIN #1 (assignment section 12):
- *
- *   SELECT i.id, i.name, it.type_name, i.purchase_date, i.stock_available, i.active
- *   FROM items i
- *   JOIN item_types it ON i.item_type_id = it.id
- *   ORDER BY i.id;
- *
- * Optional filters: search term, item type, active flag, availability bucket.
- */
-export function findAllWithType(db, { q, itemTypeId, active, availability } = {}) {
-  const needle = q?.trim().toLowerCase();
-
-  return db.items
-    .filter((item) => {
-      if (itemTypeId !== undefined && item.itemTypeId !== itemTypeId) return false;
-      if (active !== undefined && item.active !== active) return false;
-      if (!matchesAvailability(item.stockAvailable, availability)) return false;
-      if (needle) {
-        const type = db.itemTypes.find((row) => row.id === item.itemTypeId);
-        const haystack = `${item.name} ${type?.typeName ?? ''}`.toLowerCase();
-        if (!haystack.includes(needle)) return false;
-      }
-      return true;
-    })
-    .map((item) => withType(db, item))
-    .sort((a, b) => a.id - b.id);
+export async function findAllWithType(db, filters) {
+  const { where, parameters } = buildFilters(filters);
+  return query(db, `${ITEM_WITH_TYPE} ${where} ORDER BY i.id`, parameters);
 }
 
-/**
- * SELECT i.*, it.type_name FROM items i
- * JOIN item_types it ON i.item_type_id = it.id WHERE i.id = ?
- */
-export function findByIdWithType(db, id) {
-  return withType(db, db.items.find((item) => item.id === id) ?? null);
+export async function findByIdWithType(db, id) {
+  const rows = await query(db, `${ITEM_WITH_TYPE} WHERE i.id = ?`, [id]);
+  return rows[0] ?? null;
 }
 
-/** SELECT * FROM items WHERE id = ? */
-export function findById(db, id) {
-  return db.items.find((item) => item.id === id) ?? null;
+export async function findById(db, id, { forUpdate = false } = {}) {
+  const rows = await query(db, `${ITEM_BY_ID} WHERE id = ?${forUpdate ? ' FOR UPDATE' : ''}`, [id]);
+  return rows[0] ?? null;
 }
 
-/** SELECT * FROM items WHERE id IN (?) */
-export function findManyByIds(db, ids) {
-  const wanted = new Set(ids);
-  return db.items.filter((item) => wanted.has(item.id));
-}
-
-/** SELECT * FROM items WHERE LOWER(name) = LOWER(?) */
-export function findByName(db, name, { excludeId = null } = {}) {
-  const needle = name.trim().toLowerCase();
-  return (
-    db.items.find((item) => item.name.toLowerCase() === needle && item.id !== excludeId) ?? null
+export async function findManyByIds(db, ids, { forUpdate = false } = {}) {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  return query(
+    db,
+    `${ITEM_BY_ID} WHERE id IN (${placeholders}) ORDER BY id${forUpdate ? ' FOR UPDATE' : ''}`,
+    ids,
   );
 }
 
-/**
- * INSERT INTO items (name, item_type_id, purchase_date, stock_available, active)
- * VALUES (?, ?, ?, ?, ?)
- */
-export function insert(db, { name, itemTypeId, purchaseDate, stockAvailable, active }) {
-  assertNonNegative(stockAvailable);
-  const timestamp = nowIso();
-  const row = {
-    id: nextId('items'),
-    name,
-    itemTypeId,
-    purchaseDate,
-    stockAvailable,
-    active,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+export async function findByName(db, name, { excludeId = null } = {}) {
+  const rows = await query(
+    db,
+    `SELECT id FROM items
+     WHERE LOWER(name) = LOWER(?) AND (? IS NULL OR id <> ?) LIMIT 1`,
+    [name.trim(), excludeId, excludeId],
+  );
+  return rows[0] ?? null;
+}
+
+export async function insert(db, { name, itemTypeId, purchaseDate, stockAvailable, active }) {
+  const result = await query(
+    db,
+    `INSERT INTO items
+      (name, item_type_id, purchase_date, stock_available, active)
+     VALUES (?, ?, ?, ?, ?)`,
+    [name, itemTypeId, purchaseDate, stockAvailable, active ? 1 : 0],
+  );
+  return findById(db, result.insertId);
+}
+
+export async function update(db, id, patch) {
+  const columns = {
+    name: 'name',
+    itemTypeId: 'item_type_id',
+    purchaseDate: 'purchase_date',
+    stockAvailable: 'stock_available',
+    active: 'active',
   };
-  db.items.push(row);
-  return row;
-}
-
-/** UPDATE items SET ... WHERE id = ? */
-export function update(db, id, patch) {
-  const row = findById(db, id);
-  if (!row) return null;
-  if (patch.stockAvailable !== undefined) assertNonNegative(patch.stockAvailable);
-
-  for (const [key, value] of Object.entries(patch)) {
-    if (value !== undefined) row[key] = value;
+  const assignments = [];
+  const parameters = [];
+  for (const [key, column] of Object.entries(columns)) {
+    if (patch[key] === undefined) continue;
+    assignments.push(`${column} = ?`);
+    parameters.push(key === 'active' ? (patch[key] ? 1 : 0) : patch[key]);
   }
-  row.updatedAt = nowIso();
-  return row;
+  if (assignments.length) {
+    await query(db, `UPDATE items SET ${assignments.join(', ')} WHERE id = ?`, [...parameters, id]);
+  }
+  return findById(db, id);
 }
 
-/**
- * UPDATE items SET stock_available = stock_available - ? WHERE id = ? AND stock_available >= ?
- *
- * `delta` is the amount consumed: positive deducts stock, negative returns it.
- * Returns the updated row. Throws if the result would be negative, which is the
- * last line of defence behind the service level validation.
- */
-export function applyStockDelta(db, id, delta) {
-  const row = findById(db, id);
-  if (!row) return null;
-  const next = row.stockAvailable - delta;
-  assertNonNegative(next);
-  row.stockAvailable = next;
-  row.updatedAt = nowIso();
-  return row;
+export async function applyStockDelta(db, id, delta) {
+  const result = await query(
+    db,
+    `UPDATE items
+     SET stock_available = stock_available - ?
+     WHERE id = ? AND stock_available - ? >= 0`,
+    [delta, id, delta],
+  );
+  if (result.affectedRows !== 1) {
+    throw new Error(`Stock update failed for item ${id}`);
+  }
+  return findById(db, id);
 }
 
-/** DELETE FROM items WHERE id = ? */
-export function remove(db, id) {
-  const index = db.items.findIndex((item) => item.id === id);
-  if (index === -1) return false;
-  db.items.splice(index, 1);
-  return true;
+export async function remove(db, id) {
+  const result = await query(db, 'DELETE FROM items WHERE id = ?', [id]);
+  return result.affectedRows === 1;
 }
 
-/** SELECT COUNT(*) FROM purchase_items WHERE item_id = ? */
-export function countPurchaseLines(db, itemId) {
-  return db.purchaseItems.filter((line) => line.itemId === itemId).length;
+export async function countPurchaseLines(db, itemId) {
+  const [row] = await query(
+    db,
+    'SELECT COUNT(*) AS count FROM purchase_items WHERE item_id = ?',
+    [itemId],
+  );
+  return Number(row.count);
 }
 
-/**
- * Purchase history summary for the item details screen.
- *
- *   SELECT p.id, p.order_id, p.purchase_date, pi.quantity
- *   FROM purchase_items pi
- *   JOIN purchases p ON pi.purchase_id = p.id
- *   WHERE pi.item_id = ?
- *   ORDER BY p.purchase_date DESC, p.id DESC;
- */
-export function findPurchaseHistory(db, itemId) {
-  return db.purchaseItems
-    .filter((line) => line.itemId === itemId)
-    .map((line) => {
-      const purchase = db.purchases.find((row) => row.id === line.purchaseId);
-      return {
-        purchaseId: line.purchaseId,
-        orderId: purchase?.orderId ?? null,
-        purchaseDate: purchase?.purchaseDate ?? null,
-        quantity: line.quantity,
-      };
-    })
-    .sort((a, b) => b.purchaseDate?.localeCompare(a.purchaseDate) || b.purchaseId - a.purchaseId);
+export async function findPurchaseHistory(db, itemId) {
+  return query(
+    db,
+    `SELECT p.id AS purchaseId, p.order_id AS orderId,
+            p.purchase_date AS purchaseDate, pi.quantity
+     FROM purchase_items pi
+     JOIN purchases p ON pi.purchase_id = p.id
+     WHERE pi.item_id = ?
+     ORDER BY p.purchase_date DESC, p.id DESC`,
+    [itemId],
+  );
 }

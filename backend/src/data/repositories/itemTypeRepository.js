@@ -1,79 +1,67 @@
-import { nextId, nowIso } from '../store.js';
+import { query } from '../mysql.js';
 
-/**
- * item_types data access.
- *
- * Every function takes the table handle (`db`) as its first argument, the same
- * way a MySQL implementation would take a connection or pool. Swapping this
- * file for `mysql2` queries requires no changes elsewhere.
- */
-
-const byName = (a, b) => a.typeName.localeCompare(b.typeName);
-
-/** SELECT * FROM item_types ORDER BY type_name */
-export function findAll(db) {
-  return [...db.itemTypes].sort(byName);
-}
-
-/** SELECT * FROM item_types WHERE id = ? */
-export function findById(db, id) {
-  return db.itemTypes.find((row) => row.id === id) ?? null;
-}
-
-/** SELECT * FROM item_types WHERE LOWER(type_name) = LOWER(?) */
-export function findByName(db, typeName, { excludeId = null } = {}) {
-  const needle = typeName.trim().toLowerCase();
-  return (
-    db.itemTypes.find(
-      (row) => row.typeName.toLowerCase() === needle && row.id !== excludeId,
-    ) ?? null
+export async function findAll(db) {
+  return query(
+    db,
+    `SELECT id, type_name AS typeName, created_at AS createdAt, updated_at AS updatedAt
+     FROM item_types ORDER BY type_name`,
   );
 }
 
-/** INSERT INTO item_types (type_name) VALUES (?) */
-export function insert(db, { typeName }) {
-  const timestamp = nowIso();
-  const row = {
-    id: nextId('itemTypes'),
-    typeName,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
-  db.itemTypes.push(row);
-  return row;
+export async function findById(db, id) {
+  const rows = await query(
+    db,
+    `SELECT id, type_name AS typeName, created_at AS createdAt, updated_at AS updatedAt
+     FROM item_types WHERE id = ?`,
+    [id],
+  );
+  return rows[0] ?? null;
 }
 
-/** UPDATE item_types SET type_name = ? WHERE id = ? */
-export function update(db, id, { typeName }) {
-  const row = findById(db, id);
-  if (!row) return null;
-  row.typeName = typeName;
-  row.updatedAt = nowIso();
-  return row;
+export async function findByName(db, typeName, { excludeId = null } = {}) {
+  const rows = await query(
+    db,
+    `SELECT id FROM item_types
+     WHERE LOWER(type_name) = LOWER(?) AND (? IS NULL OR id <> ?) LIMIT 1`,
+    [typeName.trim(), excludeId, excludeId],
+  );
+  return rows[0] ?? null;
 }
 
-/** DELETE FROM item_types WHERE id = ? */
-export function remove(db, id) {
-  const index = db.itemTypes.findIndex((row) => row.id === id);
-  if (index === -1) return false;
-  db.itemTypes.splice(index, 1);
-  return true;
+export async function insert(db, { typeName }) {
+  const result = await query(db, 'INSERT INTO item_types (type_name) VALUES (?)', [typeName]);
+  return findById(db, result.insertId);
 }
 
-/** SELECT COUNT(*) FROM items WHERE item_type_id = ? */
-export function countItems(db, itemTypeId) {
-  return db.items.filter((item) => item.itemTypeId === itemTypeId).length;
+export async function update(db, id, { typeName }) {
+  await query(db, 'UPDATE item_types SET type_name = ? WHERE id = ?', [typeName, id]);
+  return findById(db, id);
 }
 
-/**
- * SELECT it.id, it.type_name, COUNT(i.id) AS item_count
- * FROM item_types it LEFT JOIN items i ON i.item_type_id = it.id
- * GROUP BY it.id ORDER BY it.type_name
- */
-export function findAllWithItemCounts(db) {
-  return findAll(db).map((type) => ({
-    ...type,
-    itemCount: countItems(db, type.id),
-    activeItemCount: db.items.filter((item) => item.itemTypeId === type.id && item.active).length,
-  }));
+export async function remove(db, id) {
+  const result = await query(db, 'DELETE FROM item_types WHERE id = ?', [id]);
+  return result.affectedRows === 1;
+}
+
+export async function countItems(db, itemTypeId) {
+  const [row] = await query(
+    db,
+    'SELECT COUNT(*) AS count FROM items WHERE item_type_id = ?',
+    [itemTypeId],
+  );
+  return Number(row.count);
+}
+
+export async function findAllWithItemCounts(db) {
+  return query(
+    db,
+    `SELECT it.id, it.type_name AS typeName,
+            COUNT(i.id) AS itemCount,
+            COALESCE(SUM(i.active = 1), 0) AS activeItemCount,
+            it.created_at AS createdAt, it.updated_at AS updatedAt
+     FROM item_types it
+     LEFT JOIN items i ON i.item_type_id = it.id
+     GROUP BY it.id, it.type_name, it.created_at, it.updated_at
+     ORDER BY it.type_name`,
+  );
 }

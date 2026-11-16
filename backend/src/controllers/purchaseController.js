@@ -10,17 +10,17 @@ import { methodNotAllowed } from '../utils/AppError.js';
 
 export const list = async (req, res) => {
   const filters = parsePurchaseFilters(req.query);
-  const data = purchaseService.list(filters);
+  const data = await purchaseService.list(filters);
   ok(res, data, { count: data.length, filters });
 };
 
 export const getById = async (req, res) => {
-  ok(res, purchaseService.getById(parseId(req.params.id, 'purchase id')));
+  ok(res, await purchaseService.getById(parseId(req.params.id, 'purchase id')));
 };
 
 /** Order ID the next created purchase will receive, for display on the form. */
 export const nextOrderId = async (_req, res) => {
-  ok(res, { orderId: purchaseService.peekNextOrderId() });
+  ok(res, { orderId: await purchaseService.peekNextOrderId() });
 };
 
 export const create = async (req, res) => {

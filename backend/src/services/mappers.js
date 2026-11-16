@@ -9,7 +9,7 @@ export const toItemDto = (row) => ({
   purchaseDate: row.purchaseDate,
   stockAvailable: row.stockAvailable,
   availability: availabilityFor(row.stockAvailable),
-  active: row.active,
+  active: Boolean(row.active),
   status: row.active ? 'Active' : 'Inactive',
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
@@ -18,8 +18,8 @@ export const toItemDto = (row) => ({
 export const toItemTypeDto = (row) => ({
   id: row.id,
   typeName: row.typeName,
-  ...(row.itemCount !== undefined ? { itemCount: row.itemCount } : {}),
-  ...(row.activeItemCount !== undefined ? { activeItemCount: row.activeItemCount } : {}),
+  ...(row.itemCount !== undefined ? { itemCount: Number(row.itemCount) } : {}),
+  ...(row.activeItemCount !== undefined ? { activeItemCount: Number(row.activeItemCount) } : {}),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -28,8 +28,8 @@ export const toPurchaseSummaryDto = (row) => ({
   id: row.id,
   orderId: row.orderId,
   purchaseDate: row.purchaseDate,
-  lineCount: row.lineCount,
-  totalQuantity: row.totalQuantity,
+  lineCount: Number(row.lineCount),
+  totalQuantity: Number(row.totalQuantity),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -40,8 +40,8 @@ export const toPurchaseLineDto = (line) => ({
   itemName: line.itemName,
   itemTypeId: line.itemTypeId,
   itemTypeName: line.itemTypeName,
-  itemActive: line.itemActive,
-  quantity: line.quantity,
-  currentStock: line.currentStock,
+  itemActive: Boolean(line.itemActive),
+  quantity: Number(line.quantity),
+  currentStock: Number(line.currentStock),
   availability: availabilityFor(line.currentStock),
 });

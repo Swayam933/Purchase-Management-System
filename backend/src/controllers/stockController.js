@@ -4,6 +4,6 @@ import { ok } from '../utils/response.js';
 
 export const overview = async (req, res) => {
   const filters = parseItemFilters(req.query);
-  const { summary, items } = stockService.overview(filters);
+  const { summary, items } = await stockService.overview(filters);
   ok(res, { summary, items }, { count: items.length, filters });
 };
